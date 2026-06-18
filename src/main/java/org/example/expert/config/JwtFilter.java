@@ -31,32 +31,40 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
+        if (request.getRequestURI().startsWith("/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String authorizationHeader = request.getHeader("Authorization");
 
-        if (StringUtils.hasText(authorizationHeader) && authorizationHeader.startsWith("Bearer ")) {
-            try {
-                String jwt = jwtUtil.substringToken(authorizationHeader);
-                Claims claims = jwtUtil.extractClaims(jwt);
+        if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
 
-                Long userId = Long.parseLong(claims.getSubject());
-                String email = claims.get("email", String.class);
-                UserRole userRole = UserRole.of(claims.get("userRole", String.class));
+        try {
+            String jwt = jwtUtil.substringToken(authorizationHeader);
+            Claims claims = jwtUtil.extractClaims(jwt);
 
-                AuthUser authUser = new AuthUser(userId, email, userRole);
+            Long userId = Long.parseLong(claims.getSubject());
+            String email = claims.get("email", String.class);
+            UserRole userRole = UserRole.of(claims.get("userRole", String.class));
 
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(authUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + userRole.name())));
+            AuthUser authUser = new AuthUser(userId, email, userRole);
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(authUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + userRole.name())));
 
-            } catch (ExpiredJwtException e) {
-                log.error("만료된 JWT 토큰입니다.", e);
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "만료된 JWT 토큰입니다.");
-                return;
-            } catch (JwtException | IllegalArgumentException e) {
-                log.error("유효하지 않은 JWT 토큰입니다.", e);
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 JWT 토큰입니다.");
-                return;
-            }
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        } catch (ExpiredJwtException e) {
+            log.error("만료된 JWT 토큰입니다.", e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("유효하지 않은 JWT 토큰입니다.", e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
         }
 
         filterChain.doFilter(request, response);
