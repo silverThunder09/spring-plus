@@ -31,7 +31,9 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        if (request.getRequestURI().startsWith("/auth/")) {
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/auth/") || uri.startsWith("/api/") || uri.startsWith("/ws")
+                || uri.equals("/") || uri.endsWith(".html")) {
             filterChain.doFilter(request, response);
             return;
         }
